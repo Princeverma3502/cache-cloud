@@ -1,30 +1,44 @@
-# Cache-Cloud Engine 🚀
+# CloudShield: High-Performance Edge Proxy & Cache Engine 🛡️
 
-A high-performance, distributed proxy server built with **Node.js**, **Redis**, and **React**. This project demonstrates advanced backend patterns like **Request Coalescing** to prevent cache stampedes and real-time observability.
+CloudShield is a production-grade middleware proxy designed to optimize API traffic, reduce upstream latency, and prevent "Cache Stampedes" through intelligent request coalescing. It features a real-time observability dashboard with global traffic visualization.
 
-## 🌟 Key Features
+![CloudShield Dashboard Preview](./dashboard.png)
 
--   **Request Coalescing (Wait-Group Pattern):** Identical simultaneous requests are collapsed into a single upstream call, saving bandwidth and server resources.
--   **Distributed Caching:** Leveraging Redis for sub-millisecond data retrieval.
--   **Dynamic TTL Control:** Real-time adjustment of cache expiration via the dashboard.
--   **Live Observability:** A React-based dashboard featuring:
-    -   Traffic velocity charts (Recharts).
-    -   Real-time HIT/MISS/COALESCED stream.
-    -   Instant cache purge capabilities.
+## 🚀 Key Engineering Features
 
-## 🏗️ Architecture
+### 1. Request Coalescing (The "Wait-Group" Pattern)
+Prevents redundant upstream calls by collapsing multiple concurrent requests for the same resource into a single fetch. This significantly reduces server load during traffic spikes.
 
+### 2. Distributed Caching with Redis
+Utilizes Redis for sub-millisecond data retrieval. Supports dynamic TTL (Time-to-Live) management controlled directly via the dashboard.
 
+### 3. Global Traffic Radar
+Automatically resolves upstream host IPs to geographic coordinates, providing a real-time visualization of data origins on a monochromatic world radar.
 
-The system is fully containerized using **Docker Compose**, ensuring a consistent environment across development and production.
+### 4. Smart Latency Savings Calculator
+A real-time telemetry engine that calculates the total network time saved (in milliseconds) by serving data from the cache or coalescing pending requests.
 
-## 🚀 Getting Started
+### 5. API Authentication Shield
+Implements a secure `x-api-key` header requirement to protect the proxy middleware from unauthorized use, complete with a key-rotation management system.
 
-### Prerequisites
--   Docker & Docker Compose
+---
 
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone [https://github.com/your-username/cache-cloud.git](https://github.com/your-username/cache-cloud.git)
-   cd cache-cloud
+## 🛠️ Technical Stack
+
+- **Frontend:** React, Tailwind CSS, Lucide, Recharts, React-Simple-Maps
+- **Backend:** Node.js, Express, Axios
+- **Storage:** Redis (High-speed Key-Value Store)
+- **Infrastructure:** Docker, Docker-Compose
+
+---
+
+## ⚡ Quick Start (Docker)
+
+Ensure you have Docker Desktop installed, then run:
+
+```bash
+# Clone the repository
+git clone [https://github.com/your-username/cache-cloud.git](https://github.com/your-username/cache-cloud.git)
+
+# Spin up the infrastructure
+docker-compose up --build

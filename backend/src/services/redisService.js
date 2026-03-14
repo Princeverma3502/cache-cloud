@@ -1,24 +1,28 @@
 const redis = require('redis');
+
+const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
+
 const client = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379'
+    url: redisUrl,
+    socket: {
+        reconnectStrategy: (retries) => Math.min(retries * 50, 2000)
+    }
 });
 
-client.on('error', (err) => console.log('Redis Client Error', err));
+client.on('error', (err) => console.error('Redis Client Error', err));
 
 const connectRedis = async () => {
     if (!client.isOpen) await client.connect();
 };
 
 module.exports = {
-    client,
     connectRedis,
-    // Helper to get data
     get: async (key) => {
-        const data = await client.get(key);
-        return data ? JSON.parse(data) : null;
+        const val = await client.get(key);
+        return val ? JSON.parse(val) : null;
     },
-    // Helper to save data for 60 seconds
-    set: async (key, value, ttl = 60) => {
+    set: async (key, value, ttl) => {
         await client.set(key, JSON.stringify(value), { EX: ttl });
-    }
+    },
+    client
 };
