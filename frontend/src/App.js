@@ -6,7 +6,7 @@ import { AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } f
 import { 
   ShieldCheck, Globe, Clock, Key, Settings, Sun, Moon, 
   AlertTriangle, Download, Activity, Zap, ArrowUpRight, 
-  BarChart3, Layers, Database
+  BarChart3, Layers, Database, Lock as ShieldLock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -91,7 +91,7 @@ const Dashboard = () => {
           <h2 className={`text-center text-3xl font-black mb-8 tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>CloudShield</h2>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
+                <ShieldLock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
                 <input type="password" placeholder="Passphrase" className="w-full pl-12 pr-4 py-4 rounded-2xl bg-black/20 border border-white/5 outline-none focus:border-blue-500 transition-all text-center" onChange={(e) => setPassInput(e.target.value)} />
             </div>
             <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-500 shadow-lg shadow-blue-600/20 transition-all uppercase tracking-widest text-xs">Authorize System</button>
@@ -142,7 +142,6 @@ const Dashboard = () => {
 
         {activeTab === 'monitor' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Efficiency Section */}
             <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className={`p-8 rounded-[2.5rem] border ${cardClass} glow-blue`}>
                 <div className="flex items-center gap-3 mb-10">
                     <BarChart3 className="text-blue-500" size={20} />
@@ -155,7 +154,6 @@ const Dashboard = () => {
                 </div>
             </motion.div>
 
-            {/* Performance Graph */}
             <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className={`lg:col-span-2 border rounded-[2.5rem] p-8 h-[350px] relative ${cardClass}`}>
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3">
@@ -182,7 +180,6 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </motion.div>
 
-            {/* Global Map */}
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 }} className={`lg:col-span-2 border rounded-[2.5rem] overflow-hidden h-[400px] relative ${cardClass}`}>
               <div className="absolute top-8 left-8 z-10 text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-3">
                 <Globe className="text-blue-500" size={18}/> Global Node Intercept
@@ -207,7 +204,6 @@ const Dashboard = () => {
               </div>
             </motion.div>
 
-            {/* Live Logs Sidebar */}
             <motion.div initial={{ x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-6">
               <div className={`p-8 border rounded-[2.5rem] flex items-center justify-between ${cardClass} glow-blue`}>
                 <div>
@@ -259,7 +255,6 @@ const Dashboard = () => {
   );
 };
 
-// UI Sub-components
 const StatBar = ({ label, value, total, color, icon: Icon }) => {
     const percentage = Math.round((value / total) * 100);
     return (
