@@ -1,80 +1,109 @@
-🛡️ CloudShield SaaS
-Universal Edge Monitoring & Infrastructure Analytics
-CloudShield is a full-stack Infrastructure-as-a-Service (IaaS) platform that allows any developer to monitor their website's health, global traffic, and bandwidth efficiency by simply adding a single <script> tag.
+# 🛡️ CloudShield
 
-🚀 Key Features
-Universal Integration: A drop-in <script> that works with React, Vue, WordPress, or plain HTML.
+![CloudShield Banner](https://via.placeholder.com/1200x300/020617/3b82f6?text=CloudShield+-+Global+Infrastructure+%26+Traffic+Monitoring)
 
-Real-time Telemetry: Tracks global hits, misses, and origin latency via a centralized Node.js collector.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18.x-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Auth-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 
-Infrastructure Controls: Dynamic TTL (Time-To-Live) management and Global Cache Purging.
+**CloudShield** is a full-stack, real-time infrastructure monitoring and global traffic routing dashboard. Built as a multi-tenant SaaS application, it allows developers to track global request velocity, monitor network relief (bandwidth savings), and generate shareable, public health reports for their web properties.
 
-Health Sentinel: Automated incident logging for latency spikes and connection drops.
+## ✨ Key Features
 
-Visual Analytics: Interactive global traffic map, bandwidth savings counter (MB), and velocity charts.
+* **🌍 Universal Tracking Script (`shield.js`)**: A lightweight, async JavaScript snippet that can be dropped into any HTML, WordPress, or React site to instantly begin routing telemetry data.
+* **📊 Real-Time Global Analytics**: Live request mapping using `react-simple-maps` and latency tracking visualized with `recharts`.
+* **🔗 Public SaaS Reports**: Users can generate unique, `clientId`-scoped public URLs to share infrastructure health with clients or stakeholders. Includes custom 404 routing for invalid links.
+* **📄 PDF Generation**: One-click client-side PDF export of dashboard metrics utilizing `html2canvas` and `jsPDF`.
+* **🚨 Incident Monitoring**: Automated detection of RTT latency spikes and connection drops, logged into a session history timeline.
+* **🔐 Secure Authentication**: Frictionless developer login powered by Supabase and GitHub OAuth.
+* **🎨 Modern, Fluid UI**: Fully responsive glass-morphism design with Framer Motion animations and dynamic Dark/Light mode toggling.
 
-SaaS Ready: GitHub OAuth authentication and public report sharing.
+---
 
-🛠️ The Tech Stack
-Frontend: React, Tailwind CSS, Framer Motion (Animations), Recharts, Lucide Icons.
+## 🛠️ Technology Stack
 
-Backend: Node.js, Express, response-time middleware, Axios.
+**Frontend:**
+* React.js
+* Tailwind CSS
+* Framer Motion (Animations)
+* Recharts (Data Visualization)
+* React-Simple-Maps (Geospatial Data)
+* Supabase Auth (GitHub OAuth)
 
-Database/Auth: Supabase (PostgreSQL & GitHub OAuth).
+**Backend:**
+* Node.js & Express
+* Axios & Response-Time
+* Custom In-Memory Telemetry Collector (Extendable to Redis/PostgreSQL)
 
-Deployment: Vercel (Frontend), Render (Backend).
+---
 
-📡 How It Works (Architecture)
-CloudShield operates as a third-party monitoring layer between the end-user and the developer's origin server.
+## 🚀 Quick Start
 
-The Shield Script: When a visitor loads a "shielded" site, the script captures the client ID and origin metadata.
+### Prerequisites
+* Node.js (v16 or higher)
+* A Supabase project (for GitHub Auth)
+* npm or yarn
 
-Telemetry Collection: Data is sent via a cross-origin (CORS) POST request to the CloudShield Backend.
-
-Data Aggregation: The backend processes the hit, simulates cache logic, and updates the global traffic state.
-
-Live Dashboard: The developer sees real-time updates on their private dashboard, including a health pulse and a global map of their traffic.
-
-💻 Quick Start (For Developers)
-1. Clone & Install
-Bash
-git clone https://github.com/your-username/cloudshield.git
+### 1. Clone the repository
+\`\`\`bash
+git clone https://github.com/Princeverma3502/cloudshield.git
 cd cloudshield
+\`\`\`
 
-# Install Backend
-cd backend && npm install
+### 2. Setup Backend Environment
+Navigate to the backend directory and install dependencies:
+\`\`\`bash
+cd backend
+npm install
+\`\`\`
+Start the backend server:
+\`\`\`bash
+npm run dev
+\`\`\`
 
-# Install Frontend
-cd ../frontend && npm install
-2. Environment Variables
-Create a .env in the backend folder:
-
-Plaintext
-PORT=5000
-BACKEND_URL=https://your-render-app.com
-DISCORD_WEBHOOK_URL=your_optional_webhook
-Create a .env in the frontend folder:
-
-Plaintext
-REACT_APP_SUPABASE_URL=your_supabase_url
-REACT_APP_SUPABASE_ANON_KEY=your_supabase_key
-REACT_APP_API_URL=https://your-render-app.com
-3. Run Locally
-Bash
-# In /backend
+### 3. Setup Frontend Environment
+Open a new terminal, navigate to the frontend directory, and install dependencies:
+\`\`\`bash
+cd frontend
+npm install
+\`\`\`
+Create a `.env` file in the `frontend` directory:
+\`\`\`env
+REACT_APP_SUPABASE_URL=your_supabase_project_url
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+REACT_APP_API_URL=http://localhost:10000
+\`\`\`
+Start the development server:
+\`\`\`bash
 npm start
+\`\`\`
 
-# In /frontend
-npm start
-🛡️ Integrating with your Website
-Simply paste this snippet into the <head> of your site:
+---
 
-HTML
+## 🔌 Integration Guide
+
+To monitor an external website, simply copy the auto-generated tracking script from your CloudShield **Integration** tab and paste it into the `<head>` of your target website.
+
+\`\`\`html
 <script 
-  src="https://cloudshield-backend.onrender.com/shield.js" 
-  data-client-id="YOUR_UNIQUE_ID" 
+  src="https://your-cloudshield-backend.com/shield.js" 
+  data-client-id="your-unique-user-id" 
   async>
 </script>
+\`\`\`
+*Data will instantly begin flowing into your live dashboard and world map.*
 
-📄 License
-Distributed under the MIT License. See LICENSE for more information.
+---
+
+## 💡 Architecture Highlight
+
+CloudShield operates on a decoupled architecture. The Express.js backend serves a dynamic `shield.js` file that reads the injecting script's `data-client-id` attribute. This allows the backend to securely scope all incoming telemetry (Hits, Misses, Geo-coordinates) to specific users, enabling the multi-tenant Public Report feature without data bleed.
+
+---
+
+## 🤝 Contributing
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/yourusername/cloudshield/issues).
+
+## 📝 License
+This project is [MIT](https://opensource.org/licenses/MIT) licensed.
