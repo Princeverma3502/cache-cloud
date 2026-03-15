@@ -3,9 +3,6 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    -webkit-tap-highlight-color: transparent;
-  }
   body {
     @apply bg-[#020617] text-slate-300 antialiased;
     margin: 0;
@@ -15,12 +12,10 @@
 }
 
 @layer components {
-  /* The Glassmorphism effect used for cards */
   .glass {
     @apply bg-slate-900/40 border border-slate-800/50 backdrop-blur-xl;
   }
 
-  /* Custom scrollbar for the "Live Traffic" section */
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
   }
@@ -30,9 +25,4 @@
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-slate-700 rounded-full hover:bg-slate-600;
   }
-}
-
-/* Ensure Framer Motion and Recharts don't cause layout shifts */
-.recharts-responsive-container {
-  @apply transition-opacity duration-500;
 }
