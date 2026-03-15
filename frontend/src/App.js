@@ -27,7 +27,6 @@ const Dashboard = () => {
   // --- AUTH LOGIC ---
   const handleLogin = (e) => {
     e.preventDefault();
-    // In production, this validates against your ADMIN_PASSPHRASE via headers
     if (passInput.length > 0) {
       setIsAuthenticated(true);
       localStorage.setItem("admin_token", passInput);
@@ -128,11 +127,20 @@ const Dashboard = () => {
   // --- DASHBOARD VIEW ---
   return (
     <div className={`min-h-screen transition-colors duration-500 p-8 font-sans ${themeClass}`}>
+      {/* CSS FIX: These styles are now properly injected via a style tag */}
+      <style>
+        {`
+          body { font-family: 'Inter', sans-serif; }
+          .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+          .glow-blue { box-shadow: 0 0 20px rgba(56, 189, 248, 0.2); }
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+        `}
+      </style>
+      
       <Toaster />
       <div className="max-w-7xl mx-auto">
         <header className="flex justify-between items-center mb-10">
           <div className="flex items-center gap-3">
-            {/* ADAPTIVE LOGO */}
             <img 
               src="/logo.png" 
               alt="CloudShield" 
