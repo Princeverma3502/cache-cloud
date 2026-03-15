@@ -9,6 +9,7 @@ import {
   BarChart3, Layers, Database, Lock
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import './index.css';
 
 const GEO_DATA_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cloudshield-backend.onrender.com';
