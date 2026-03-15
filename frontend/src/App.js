@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
@@ -10,9 +10,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Fixed Map URL
-const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-const API_BASE = process.env.REACT_APP_API_URL || 'https://cloudshield-backend.onrender.com';
+const GEO_DATA_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cloudshield-backend.onrender.com';
 
 const Dashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -26,25 +25,25 @@ const Dashboard = () => {
 
   const fetchData = async () => {
     try {
-      const s = await axios.get(`${API_BASE}/api/performance`);
-      const l = await axios.get(`${API_BASE}/api/logs`);
+      const s = await axios.get(`${API_BASE_URL}/api/performance`);
+      const l = await axios.get(`${API_BASE_URL}/api/logs`);
       setStats(s.data);
-      setLogs(l.data);
+      setLogs(l.data || []);
       setChartData(prev => [...prev, { 
         time: new Date().toLocaleTimeString().slice(-5), 
         hits: s.data.hits, 
         misses: s.data.misses 
       }].slice(-15));
     } catch (e) { 
-      console.log("Backend offline or CORS issue..."); 
+      console.warn("Telemetry offline..."); 
     }
   };
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchData();
-      const int = setInterval(fetchData, 5000); // Increased interval to reduce load
-      return () => clearInterval(int);
+      const intervalId = setInterval(fetchData, 5000);
+      return () => clearInterval(intervalId);
     }
   }, [isAuthenticated]);
 
@@ -62,16 +61,16 @@ const Dashboard = () => {
   };
 
   const downloadCSV = () => {
-    if (logs.length === 0) return toast.error("No logs to export");
+    if (!logs.length) return toast.error("No logs available");
     const headers = "Timestamp,Status,URL,Latency\n";
     const rows = logs.map(l => `${new Date().toISOString()},${l.status},${l.url},${l.latency}ms`).join("\n");
     const blob = new Blob([headers + rows], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `CloudShield_Export_${Date.now()}.csv`;
-    a.click();
-    toast.success("Log Report Generated");
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Shield_Logs_${Date.now()}.csv`;
+    link.click();
+    toast.success("Logs Exported");
   };
 
   useEffect(() => {
@@ -79,7 +78,7 @@ const Dashboard = () => {
   }, []);
 
   const themeClass = isDark ? "bg-[#020617] text-slate-300" : "bg-slate-50 text-slate-900";
-  const cardClass = isDark ? "bg-slate-900/40 border-slate-800 backdrop-blur-xl" : "bg-white border-slate-200 shadow-xl shadow-blue-500/5";
+  const cardClass = isDark ? "bg-slate-900/40 border-slate-800 backdrop-blur-xl" : "bg-white border-slate-200 shadow-xl";
   const totalRequests = (stats.hits + stats.misses + stats.coalesced) || 1;
 
   if (!isAuthenticated) {
@@ -98,7 +97,7 @@ const Dashboard = () => {
                 <ShieldLock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
                 <input type="password" placeholder="Passphrase" className="w-full pl-12 pr-4 py-4 rounded-2xl bg-black/20 border border-white/5 outline-none focus:border-blue-500 transition-all text-center" onChange={(e) => setPassInput(e.target.value)} />
             </div>
-            <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-500 shadow-lg shadow-blue-600/20 transition-all uppercase tracking-widest text-xs">Authorize System</button>
+            <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-500 shadow-lg transition-all uppercase tracking-widest text-xs">Authorize System</button>
           </form>
         </motion.div>
       </div>
@@ -107,21 +106,11 @@ const Dashboard = () => {
 
   return (
     <div className={`min-h-screen transition-colors duration-700 p-8 font-sans ${themeClass} overflow-x-hidden`}>
-      <style>
-        {`
-          body { font-family: 'Inter', sans-serif; }
-          .glass { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-          .scrollbar-hide::-webkit-scrollbar { display: none; }
-          .recharts-cartesian-grid-horizontal line { stroke: rgba(255,255,255,0.03); }
-          .glow-blue { box-shadow: 0 0 40px rgba(59, 130, 246, 0.08); }
-        `}
-      </style>
-      
       <Toaster position="bottom-right" />
       <div className="max-w-7xl mx-auto">
         <header className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
           <div className="flex items-center gap-4 group">
-            <motion.div whileHover={{ rotate: 180 }} transition={{ type: "spring", stiffness: 200 }} className="p-2 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20">
+            <motion.div whileHover={{ rotate: 180 }} transition={{ type: "spring", stiffness: 200 }} className="p-2 bg-blue-600 rounded-2xl">
                 <img src="/logo.png" alt="Logo" className="w-10 h-10 brightness-0 invert" />
             </motion.div>
             <div>
@@ -131,8 +120,7 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-4 bg-black/10 p-2 rounded-3xl border border-white/5">
-            <button onClick={downloadCSV} className="p-3 text-slate-400 hover:text-blue-500 transition-colors tooltip" title="Export CSV"><Download size={20} /></button>
-            <div className="h-6 w-px bg-white/10 mx-2" />
+            <button onClick={downloadCSV} className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Download size={20} /></button>
             <button onClick={() => setIsDark(!isDark)} className="p-3 text-slate-400 hover:text-amber-500 transition-colors">
                 {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
@@ -146,7 +134,7 @@ const Dashboard = () => {
 
         {activeTab === 'monitor' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className={`p-8 rounded-[2.5rem] border ${cardClass} glow-blue`}>
+            <div className={`p-8 rounded-[2.5rem] border ${cardClass}`}>
                 <div className="flex items-center gap-3 mb-10">
                     <BarChart3 className="text-blue-500" size={20} />
                     <h3 className="text-[11px] font-black uppercase text-slate-500 tracking-[0.2em]">Efficiency Engine</h3>
@@ -156,94 +144,66 @@ const Dashboard = () => {
                     <StatBar label="Coalesced" value={stats.coalesced} total={totalRequests} color="bg-purple-500" icon={Layers} />
                     <StatBar label="Direct Pull" value={stats.misses} total={totalRequests} color="bg-amber-500" icon={Database} />
                 </div>
-            </motion.div>
+            </div>
 
-            <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className={`lg:col-span-2 border rounded-[2.5rem] p-8 h-[350px] relative ${cardClass}`}>
-              <div className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-3">
-                    <Activity className="text-blue-500" size={20} />
-                    <h3 className="text-[11px] font-black uppercase text-slate-500 tracking-[0.2em]">Throughput Stream</h3>
-                </div>
-                <div className="flex gap-4 text-[9px] font-bold">
-                    <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"/> SYSTEM HITS</span>
-                    <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"/> MISSES</span>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height="80%">
+            <div className={`lg:col-span-2 border rounded-[2.5rem] p-8 h-[350px] relative ${cardClass}`}>
+              <ResponsiveContainer width="100%" height="90%">
                 <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorHits" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
                   <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '16px', fontSize: '10px' }} />
-                  <Area animationBegin={0} animationDuration={1500} type="monotone" dataKey="hits" stroke="#3b82f6" fill="url(#colorHits)" strokeWidth={4} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                  <Area animationBegin={300} animationDuration={1500} type="monotone" dataKey="misses" stroke="#f59e0b" fill="transparent" strokeWidth={2} strokeDasharray="6 6" />
+                  <Area type="monotone" dataKey="hits" stroke="#3b82f6" fillOpacity={0.1} fill="#3b82f6" strokeWidth={4} />
+                  <Area type="monotone" dataKey="misses" stroke="#f59e0b" fill="transparent" strokeWidth={2} strokeDasharray="6 6" />
                 </AreaChart>
               </ResponsiveContainer>
-            </motion.div>
+            </div>
 
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 }} className={`lg:col-span-2 border rounded-[2.5rem] overflow-hidden h-[400px] relative ${cardClass}`}>
-              <div className="absolute top-8 left-8 z-10 text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-3">
-                <Globe className="text-blue-500" size={18}/> Global Node Intercept
-              </div>
-              <ComposableMap projectionConfig={{ scale: 150 }} style={{ width: "100%", height: "100%" }}>
-                <Geographies geography={geoUrl}>
+            <div className={`lg:col-span-2 border rounded-[2.5rem] overflow-hidden h-[400px] relative ${cardClass}`}>
+              <ComposableMap projectionConfig={{ scale: 140 }} style={{ width: "100%", height: "100%" }}>
+                <Geographies geography={GEO_DATA_URL}>
                   {({ geographies }) => geographies.map((geo) => (
-                    <Geography key={geo.rsmKey} geography={geo} fill={isDark ? "#0f172a" : "#cbd5e1"} stroke={isDark ? "#1e293b" : "#f1f5f9"} strokeWidth={0.5} style={{ default: { outline: 'none' }, hover: { fill: '#1e3a8a', outline: 'none' } }} />
+                    <Geography key={geo.rsmKey} geography={geo} fill={isDark ? "#0f172a" : "#cbd5e1"} stroke={isDark ? "#1e293b" : "#f1f5f9"} strokeWidth={0.5} style={{ default: { outline: 'none' } }} />
                   ))}
                 </Geographies>
-                {logs.map((log, i) => log.geo?.lat && (
-                  <Marker key={i} coordinates={[log.geo.lon, log.geo.lat]}>
-                    <motion.circle initial={{ scale: 0 }} animate={{ scale: 1 }} r={5} fill={log.status === 'HIT' ? '#3b82f6' : '#f59e0b'} className="animate-ping opacity-25" />
+                {logs.filter(l => l.geo && l.geo.lat).map((log, i) => (
+                  <Marker key={`marker-${i}`} coordinates={[log.geo.lon, log.geo.lat]}>
                     <circle r={3} fill={log.status === 'HIT' ? '#3b82f6' : '#f59e0b'} />
                   </Marker>
                 ))}
               </ComposableMap>
-            </motion.div>
+            </div>
 
-            <motion.div initial={{ x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-6">
-              <div className={`p-8 border rounded-[2.5rem] flex items-center justify-between ${cardClass} glow-blue`}>
+            <div className="space-y-6">
+              <div className={`p-8 border rounded-[2.5rem] flex items-center justify-between ${cardClass}`}>
                 <div>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Time Salvage</p>
-                    <p className="text-4xl font-black text-blue-500">-{stats.totalSavedMs}<span className="text-lg opacity-50">ms</span></p>
+                    <p className="text-4xl font-black text-blue-500">-{stats.totalSavedMs}ms</p>
                 </div>
-                <div className="w-14 h-14 rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-500"><Clock size={28} /></div>
+                <Clock size={28} className="text-blue-500" />
               </div>
 
               <div className={`p-8 border rounded-[2.5rem] ${cardClass} h-[260px] flex flex-col`}>
                 <h4 className="text-[11px] font-black text-slate-500 uppercase mb-6 tracking-widest flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/> Live Traffic
                 </h4>
-                <div className="space-y-4 overflow-y-auto pr-2 scrollbar-hide flex-1">
-                  {logs.length > 0 ? logs.map((log, i) => (
-                    <div key={i} className="flex justify-between items-center text-[10px] font-mono border-b border-white/5 pb-3 group">
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2 py-0.5 rounded-md font-bold ${log.status === 'HIT' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'}`}>{log.status}</span>
-                        <span className="opacity-50 truncate w-28">{log.url}</span>
-                      </div>
+                <div className="space-y-4 overflow-y-auto flex-1">
+                  {logs.slice(0, 10).map((log, i) => (
+                    <div key={i} className="flex justify-between items-center text-[10px] font-mono border-b border-white/5 pb-3">
+                      <span className={log.status === 'HIT' ? 'text-blue-500' : 'text-amber-500'}>{log.status}</span>
+                      <span className="opacity-50 truncate w-32">{log.url}</span>
                       <span className="font-bold">{log.latency}ms</span>
                     </div>
-                  )) : (
-                    <div className="h-full flex flex-col items-center justify-center opacity-20">
-                        <Activity size={32} className="mb-2 animate-bounce" />
-                        <p className="text-[10px] italic uppercase font-bold tracking-widest">Awaiting Engine Data...</p>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         ) : (
-          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="max-w-2xl mx-auto space-y-8">
+          <div className="max-w-2xl mx-auto">
             <div className={`border rounded-[2.5rem] p-10 ${cardClass}`}>
-              <h3 className="text-xl font-black mb-8 flex items-center gap-4 text-blue-500"><Settings size={24} /> Engine TTL Control</h3>
-              <input type="range" min="10" max="3600" value={ttlInput} onChange={(e) => setTtlInput(e.target.value)} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600 mb-8" />
-              <button className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl text-[10px] uppercase tracking-[0.3em] hover:bg-blue-500 transition-all">Re-sync Engine Config</button>
-              <button onClick={handleLogout} className="w-full mt-4 py-3 text-red-500 text-[10px] font-black uppercase tracking-widest hover:opacity-70">Terminate Session</button>
+              <h3 className="text-xl font-black mb-8 flex items-center gap-4 text-blue-500"><Settings size={24} /> Configuration</h3>
+              <input type="range" min="10" max="3600" value={ttlInput} onChange={(e) => setTtlInput(e.target.value)} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer mb-8" />
+              <button onClick={handleLogout} className="w-full py-3 text-red-500 text-[10px] font-black uppercase tracking-widest">Terminate Session</button>
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
@@ -253,19 +213,16 @@ const Dashboard = () => {
 const StatBar = ({ label, value, total, color, icon: Icon }) => {
     const percentage = Math.round((value / total) * 100) || 0;
     return (
-        <div className="group">
+        <div>
             <div className="flex justify-between items-end mb-3">
                 <div className="flex items-center gap-3">
                     <Icon size={16} className="text-slate-400" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
                 </div>
-                <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-black text-white">{value}</span>
-                    <span className="text-[10px] font-bold text-slate-500">{percentage}%</span>
-                </div>
+                <span className="text-xl font-black text-white">{value}</span>
             </div>
-            <div className="h-2 w-full bg-slate-800/50 rounded-full overflow-hidden border border-white/5">
-                <motion.div animate={{ width: `${percentage}%` }} className={`h-full ${color} rounded-full`} />
+            <div className="h-2 w-full bg-slate-800/50 rounded-full overflow-hidden">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${percentage}%` }} className={`h-full ${color} rounded-full`} />
             </div>
         </div>
     );
