@@ -8,15 +8,27 @@
     <meta property="og:image" content="%PUBLIC_URL%/og-image.png">
     <meta property="og:url" content="https://cloud-shield.vercel.app/">
     <meta name="twitter:card" content="summary_large_image">
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
     <title>CloudShield | Advanced Proxy Cache</title>
-      body { font-family: 'Inter', sans-serif; background-color: #020617; }
-      .glass { background: rgba(30, 41, 59, 0.7); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-      .glow-blue { box-shadow: 0 0 20px rgba(56, 189, 248, 0.2); }
+    
+    <style>
+      /* This is the only place these styles should exist */
+      body { 
+        font-family: 'Inter', sans-serif; 
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
     </style>
   </head>
   <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
   </body>
 </html>
