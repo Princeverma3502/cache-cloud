@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
-import { AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   ShieldCheck, Globe, Clock, Key, Settings, Sun, Moon, 
   AlertTriangle, Download, Activity, Zap, ArrowUpRight, 
-  BarChart3, Layers, Database, Lock as ShieldLock
+  BarChart3, Layers, Database, Lock
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const GEO_DATA_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cloudshield-backend.onrender.com';
@@ -94,7 +94,7 @@ const Dashboard = () => {
           <h2 className={`text-center text-3xl font-black mb-8 tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>CloudShield</h2>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="relative">
-                <ShieldLock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
                 <input type="password" placeholder="Passphrase" className="w-full pl-12 pr-4 py-4 rounded-2xl bg-black/20 border border-white/5 outline-none focus:border-blue-500 transition-all text-center" onChange={(e) => setPassInput(e.target.value)} />
             </div>
             <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-500 shadow-lg transition-all uppercase tracking-widest text-xs">Authorize System</button>
@@ -163,7 +163,7 @@ const Dashboard = () => {
                     <Geography key={geo.rsmKey} geography={geo} fill={isDark ? "#0f172a" : "#cbd5e1"} stroke={isDark ? "#1e293b" : "#f1f5f9"} strokeWidth={0.5} style={{ default: { outline: 'none' } }} />
                   ))}
                 </Geographies>
-                {logs.filter(l => l.geo && l.geo.lat).map((log, i) => (
+                {logs && logs.length > 0 && logs.filter(l => l.geo && typeof l.geo.lat === 'number' && typeof l.geo.lon === 'number').map((log, i) => (
                   <Marker key={`marker-${i}`} coordinates={[log.geo.lon, log.geo.lat]}>
                     <circle r={3} fill={log.status === 'HIT' ? '#3b82f6' : '#f59e0b'} />
                   </Marker>
