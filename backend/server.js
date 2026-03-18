@@ -16,9 +16,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 let userConfigs = {};
 let globalTraffic = [];
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(express.json());
 
 const allowedOrigins = ['http://localhost:3000', 'https://cloud-shield.vercel.app'];
@@ -37,22 +35,22 @@ const telemetryLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   keyGenerator: (req) => req.body.clientId || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-  handler: (req, res) => {
-    res.status(429).json({ error: "Rate limit exceeded" });
-  }
+  handler: (req, res) => res.status(429).json({ error: "Rate limit" })
 });
 
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: "Missing token" });
   }
   const token = authHeader.split(' ')[1];
   try {
-    req.user = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+    req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ error: "Invalid token" });
+    console.error("Auth Error:", err.message);
+    return res.status(401).json({ error: "Invalid token signature" });
   }
 };
 
@@ -83,18 +81,15 @@ const telemetrySchema = z.object({
 app.post('/api/telemetry', telemetryLimiter, async (req, res) => {
   const validation = telemetrySchema.safeParse(req.body);
   if (!validation.success) return res.status(400).json({ error: "Invalid data" });
-
   const { clientId, origin, path } = validation.data;
   if (!userConfigs[clientId]) {
     const { data } = await supabase.from('user_configs').select('ttl, domains').eq('user_id', clientId).single();
     userConfigs[clientId] = data || { ttl: 60, domains: [] };
   }
-
   const config = userConfigs[clientId];
   if (!config.domains.includes(origin) && !['localhost', '127.0.0.1'].includes(origin)) {
-    return res.status(403).json({ error: "Domain not whitelisted" });
+    return res.status(403).json({ error: "Unauthorized domain" });
   }
-
   const entry = {
     clientId, origin, path, timestamp: new Date(),
     status: Math.random() > 0.1 ? 'HIT' : 'MISS',
@@ -109,12 +104,10 @@ app.post('/api/telemetry', telemetryLimiter, async (req, res) => {
 app.get('/api/performance', async (req, res) => {
   const { clientId } = req.query;
   if (!clientId) return res.status(400).json({ error: "Missing ID" });
-  
   if (!userConfigs[clientId]) {
     const { data } = await supabase.from('user_configs').select('ttl, domains').eq('user_id', clientId).single();
     userConfigs[clientId] = data || { ttl: 60, domains: [] };
   }
-
   const data = globalTraffic.filter(t => t.clientId === clientId);
   const hits = data.filter(t => t.status === 'HIT').length;
   res.json({ hits, misses: data.length - hits, ttl: userConfigs[clientId].ttl, domains: userConfigs[clientId].domains });
@@ -126,21 +119,20 @@ app.get('/api/logs', (req, res) => {
 });
 
 app.post('/api/settings', requireAuth, async (req, res) => {
-  const userId = req.user.sub;
+  const userId = req.user.sub || req.user.id;
   const { ttl, domains } = req.body;
   const parsedDomains = Array.isArray(domains) ? domains.map(d => d.toLowerCase().trim()) : [];
-
   const { data, error } = await supabase.from('user_configs').upsert({
     user_id: userId, ttl: parseInt(ttl) || 60, domains: parsedDomains, updated_at: new Date()
   }).select().single();
-
-  if (error) return res.status(500).json({ error: "DB Error" });
+  if (error) return res.status(500).json({ error: error.message });
   userConfigs[userId] = { ttl: data.ttl, domains: data.domains };
   res.json({ success: true, config: userConfigs[userId] });
 });
 
 app.post('/api/purge', requireAuth, (req, res) => {
-  globalTraffic = globalTraffic.filter(t => t.clientId !== req.user.sub);
+  const userId = req.user.sub || req.user.id;
+  globalTraffic = globalTraffic.filter(t => t.clientId !== userId);
   res.json({ success: true });
 });
 
