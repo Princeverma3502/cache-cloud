@@ -21,27 +21,29 @@ const supabase = createClient(
 );
 
 const GEO_DATA_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cloudshield-backend.onrender.com';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [reportId, setReportId] = useState(null);
   const [isValidReport, setIsValidReport] = useState(true);
-  const [stats, setStats] = useState({ hits: 0, misses: 0, coalesced: 0, totalSavedMs: 0, ttl: 60 });
+  const [stats, setStats] = useState({ hits: 0, misses: 0, coalesced: 0, totalSavedMs: 0, ttl: 60, domains: [] });
   const [logs, setLogs] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [activeTab, setActiveTab] = useState('monitor');
   const [ttlInput, setTtlInput] = useState(60);
+  const [domainsInput, setDomainsInput] = useState(''); 
   const [isDark, setIsDark] = useState(true);
   const [healthStatus, setHealthStatus] = useState('stable');
   const [totalSavedData, setTotalSavedData] = useState(0);
-
-  // Detect Public Report Mode
+  
   useEffect(() => {
     const path = window.location.pathname;
     if (path.startsWith('/report/')) {
-      setReportId(path.split('/')[2]);
+      const rawId = path.split('/')[2];
+      const sanitizedId = rawId.replace(/[^a-zA-Z0-9-]/g, ''); 
+      setReportId(sanitizedId);
     } else {
       supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
@@ -70,6 +72,8 @@ export default function App() {
       
       setHealthStatus(currentHealth);
       setStats(s.data);
+      setTtlInput(s.data.ttl || 60); 
+      setDomainsInput((s.data.domains || []).join(', '));
       setLogs(l.data || []);
       setTotalSavedData((s.data.hits * 0.15).toFixed(2));
       setIsValidReport(true);
@@ -90,19 +94,31 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, [session, reportId]);
 
-  const handleUpdateTTL = async () => {
+  const handleUpdateSettings = async () => {
     try {
-      await axios.post(`${API_BASE_URL}/api/settings`, { ttl: parseInt(ttlInput) });
-      toast.success(`TTL updated to ${ttlInput}s`);
-    } catch (e) { toast.error("Update failed"); }
+      const headers = session ? { Authorization: `Bearer ${session.access_token}` } : {};
+      const domainArray = domainsInput.split(',').map(d => d.trim()).filter(Boolean);
+
+      await axios.post(`${API_BASE_URL}/api/settings`, { 
+        ttl: parseInt(ttlInput),
+        domains: domainArray 
+      }, { headers });
+
+      toast.success("Security & Infrastructure settings updated!");
+    } catch (e) { 
+      toast.error("Unauthorized: Update failed"); 
+    }
   };
 
   const purgeCache = async () => {
     if (!window.confirm("Purge global cache?")) return;
     try {
-      await axios.post(`${API_BASE_URL}/api/purge`);
-      toast.success("Global Cache Purged", { icon: '🔥' });
-    } catch (e) { toast.error("Purge failed"); }
+      const headers = session ? { Authorization: `Bearer ${session.access_token}` } : {};
+      await axios.post(`${API_BASE_URL}/api/purge`, {}, { headers });
+      toast.success("Global Cache Purged Securely", { icon: '🔥' });
+    } catch (e) { 
+      toast.error("Unauthorized: Purge failed"); 
+    }
   };
 
   const copyPublicReport = () => {
@@ -115,7 +131,6 @@ export default function App() {
     const element = document.getElementById('report-area');
     toast.loading("Generating PDF...", { id: 'pdf-toast' });
     
-    // Temporarily hide map to prevent canvas CORS issues if they arise
     const mapEl = document.getElementById('world-map');
     if(mapEl) mapEl.style.opacity = '0.5';
 
@@ -132,7 +147,6 @@ export default function App() {
   const cardClass = isDark ? "glass" : "bg-white border-slate-200 shadow-xl";
   const totalRequests = (stats.hits + stats.misses) || 1;
 
-  // 404 View
   if (!isValidReport) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-6 text-center ${themeClass}`}>
@@ -140,13 +154,12 @@ export default function App() {
           <AlertTriangle size={60} className="text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-black uppercase italic mb-4">Report Not Found</h1>
           <p className="opacity-60 mb-8">This infrastructure report does not exist.</p>
-          <button onClick={() => window.location.href = '/'} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-[10px]">Return Home</button>
+          <button onClick={() => window.location.assign('/')} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-[10px]">Return Home</button>
         </div>
       </div>
     );
   }
 
-  // Login View
   if (!session && !reportId) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-6 ${isDark ? 'bg-[#020617]' : 'bg-slate-100'}`}>
@@ -162,7 +175,6 @@ export default function App() {
     );
   }
 
-  // Main Dashboard / Report View
   return (
     <div id="report-area" className={`min-h-screen transition-colors duration-700 p-6 md:p-10 ${themeClass}`}>
       <Toaster position="bottom-right" />
@@ -203,7 +215,6 @@ export default function App() {
           {activeTab === 'monitor' ? (
             <motion.div key="m" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
-              {/* Stats Card */}
               <div className={`p-8 rounded-[2.5rem] border ${cardClass}`}>
                 <div className="mb-8 p-6 rounded-3xl bg-blue-600/10 border border-blue-500/20">
                   <div className="flex justify-between items-center mb-2">
@@ -235,7 +246,6 @@ export default function App() {
                 </div>
               </div>
               
-              {/* Traffic Chart */}
               <div className={`lg:col-span-2 border rounded-[2.5rem] p-8 h-[400px] ${cardClass}`}>
                 <div className="flex justify-between items-center mb-6">
                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">Global Request Velocity</h4>
@@ -253,8 +263,7 @@ export default function App() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Map Visualization */}
-              <div id="world-map" className={`lg:col-span-3 border rounded-[3rem] h-[450px] overflow-hidden ${cardClass}`}>
+              <div id="world-map" className={`lg:col-span-3 border rounded-[3rem] h-[450px] overflow-hidden relative ${cardClass}`}>
                 <div className="absolute top-8 left-8 z-10">
                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2"><Globe size={14}/> Live Origin Trace</h4>
                 </div>
@@ -320,7 +329,21 @@ export default function App() {
                       <Clock size={20} className="opacity-20" />
                     </div>
                     <input type="range" min="10" max="3600" step="10" value={ttlInput} onChange={(e) => setTtlInput(e.target.value)} className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600 mb-8" />
-                    <button onClick={handleUpdateTTL} className="w-full py-5 bg-blue-600 text-white font-black rounded-3xl text-[10px] uppercase hover:bg-blue-500 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"><Save size={14} /> Commit Infrastructure Changes</button>
+                    
+                    <div className="flex justify-between items-end mb-4 mt-6">
+                      <p className="text-[10px] font-black uppercase tracking-widest italic opacity-60 flex items-center gap-2"><ShieldCheck size={14} /> Allowed Domains Whitelist</p>
+                    </div>
+                    <input 
+                      type="text" 
+                      value={domainsInput} 
+                      onChange={(e) => setDomainsInput(e.target.value)} 
+                      placeholder="e.g. mywebsite.com, my-blog.vercel.app"
+                      className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[12px] font-mono text-blue-300 mb-8 outline-none focus:border-blue-500 transition-colors"
+                    />
+
+                    <button onClick={handleUpdateSettings} className="w-full py-5 bg-blue-600 text-white font-black rounded-3xl text-[10px] uppercase hover:bg-blue-500 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                      <Save size={14} /> Commit Security Settings
+                    </button>
                   </section>
                   <div className="h-[1px] bg-white/5" />
                   <section className="flex gap-4">

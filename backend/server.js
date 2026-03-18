@@ -4,22 +4,21 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const sanitizeHtml = require('sanitize-html');
+const { z } = require('zod');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// GLOBAL DATA STORE (In-Memory)
-let config = { ttl: 60 };
-let globalTraffic = []; 
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-// ==========================================
-// 🛡️ SECURITY LAYER 1: HTTP Headers & CORS
-// ==========================================
-app.use(helmet()); // Hides Express, prevents clickjacking
+let userConfigs = {};
+let globalTraffic = [];
+
+app.use(helmet());
 app.use(express.json());
 
-// Whitelist YOUR frontend URLs here (Localhost + Vercel/Netlify URL)
 const whitelist = ['http://localhost:3000', process.env.FRONTEND_URL];
 const strictCors = cors({
   origin: function (origin, callback) {
@@ -31,18 +30,20 @@ const strictCors = cors({
   }
 });
 
-// ==========================================
-// 🛡️ SECURITY LAYER 2: Rate Limiting
-// ==========================================
 const telemetryLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // Max 100 pings per minute per IP
-  message: { error: "Too many requests, slow down." }
+  windowMs: 60 * 1000,
+  max: 100,
+  keyGenerator: (req) => {
+    return req.body.clientId || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Too many requests, slow down.",
+      retryAfter: "60 seconds"
+    });
+  }
 });
 
-// ==========================================
-// 🛡️ SECURITY LAYER 3: JWT Verification
-// ==========================================
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -51,20 +52,14 @@ const requireAuth = (req, res, next) => {
   
   const token = authHeader.split(' ')[1];
   try {
-    // Cryptographically verify the token using your Supabase Secret
     const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
-    req.user = decoded; // Token is legit! Attach user data to request
+    req.user = decoded;
     next();
   } catch (err) {
     return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
   }
 };
 
-// ==========================================
-// 🌐 PUBLIC API ROUTES
-// ==========================================
-
-// Universal Script Delivery
 app.get('/shield.js', cors(), (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   const BACKEND_URL = process.env.BACKEND_URL || `https://${req.get('host')}`;
@@ -90,17 +85,53 @@ app.get('/shield.js', cors(), (req, res) => {
   res.send(scriptContent);
 });
 
-// Telemetry Collector (Open CORS so any website can send data, but Rate Limited)
-app.options('/api/telemetry', cors()); // Allow pre-flight requests
-app.post('/api/telemetry', cors(), telemetryLimiter, (req, res) => {
-  
-  // 🛡️ SECURITY LAYER 4: Input Sanitization (Prevents XSS)
-  const safeClientId = sanitizeHtml(req.body.clientId || '', { allowedTags: [] });
-  const safeOrigin = sanitizeHtml(req.body.origin || '', { allowedTags: [] });
-  const safePath = sanitizeHtml(req.body.path || '/', { allowedTags: [] });
+const telemetrySchema = z.object({
+  clientId: z.string().min(10).max(100),
+  origin: z.string().min(3).max(200),
+  path: z.string().max(500).default('/')
+}).strict();
 
-  if (!safeClientId || !safeOrigin) {
-    return res.status(400).json({ error: "Malformed telemetry data" });
+app.options('/api/telemetry', cors());
+app.post('/api/telemetry', cors(), telemetryLimiter, async (req, res) => {
+  const validation = telemetrySchema.safeParse(req.body);
+  
+  if (!validation.success) {
+    return res.status(400).json({ 
+      error: "Malformed telemetry data", 
+      details: validation.error.issues 
+    });
+  }
+
+  const { clientId, origin, path } = validation.data;
+  const safeClientId = sanitizeHtml(clientId, { allowedTags: [] });
+  const safeOrigin = sanitizeHtml(origin, { allowedTags: [] });
+  const safePath = sanitizeHtml(path, { allowedTags: [] });
+
+  if (!userConfigs[safeClientId]) {
+    const { data, error } = await supabase
+      .from('user_configs')
+      .select('ttl, domains')
+      .eq('user_id', safeClientId)
+      .single();
+      
+    if (data) {
+      userConfigs[safeClientId] = { ttl: data.ttl, domains: data.domains };
+    } else {
+      userConfigs[safeClientId] = { ttl: 60, domains: [] };
+    }
+  }
+
+  const clientConfig = userConfigs[safeClientId];
+  const whitelist = clientConfig.domains || [];
+
+  if (whitelist.length === 0) {
+    return res.status(403).json({ error: "Zero-Trust enforced: No domains whitelisted." });
+  }
+
+  const isAllowed = whitelist.includes(safeOrigin) || safeOrigin.includes('localhost') || safeOrigin === '127.0.0.1';
+  
+  if (!isAllowed) {
+    return res.status(403).json({ error: "Origin domain not whitelisted." });
   }
   
   const entry = {
@@ -114,18 +145,38 @@ app.post('/api/telemetry', cors(), telemetryLimiter, (req, res) => {
   };
 
   globalTraffic.push(entry);
-  if (globalTraffic.length > 500) globalTraffic.shift(); // Keep memory clean
+  if (globalTraffic.length > 500) globalTraffic.shift(); 
   
   res.status(202).json({ status: "recorded" });
 });
 
-// Read-Only Dashboard Routes (Strict CORS to prevent other websites from stealing data)
-app.get('/api/performance', strictCors, (req, res) => {
+app.get('/api/performance', strictCors, async (req, res) => {
   const { clientId } = req.query;
   const data = clientId ? globalTraffic.filter(t => t.clientId === clientId) : globalTraffic;
   const hits = data.filter(t => t.status === 'HIT').length;
   const misses = data.filter(t => t.status === 'MISS').length;
-  res.json({ hits, misses, ttl: config.ttl, totalSavedMs: hits * 45 });
+  
+  if (clientId && !userConfigs[clientId]) {
+    const { data: dbData } = await supabase
+      .from('user_configs')
+      .select('ttl, domains')
+      .eq('user_id', clientId)
+      .single();
+    
+    if (dbData) {
+      userConfigs[clientId] = { ttl: dbData.ttl, domains: dbData.domains };
+    } else {
+      userConfigs[clientId] = { ttl: 60, domains: [] };
+    }
+  }
+
+  const clientConfig = userConfigs[clientId] || { ttl: 60, domains: [] };
+
+  res.json({ 
+    hits, misses, totalSavedMs: hits * 45,
+    ttl: clientConfig.ttl, 
+    domains: clientConfig.domains 
+  });
 });
 
 app.get('/api/logs', strictCors, (req, res) => {
@@ -134,22 +185,43 @@ app.get('/api/logs', strictCors, (req, res) => {
   res.json(data.slice(-20).reverse());
 });
 
-// ==========================================
-// 🔒 SECURE ADMIN ROUTES (Requires valid JWT)
-// ==========================================
-app.post('/api/settings', strictCors, requireAuth, (req, res) => {
-  const newTtl = parseInt(req.body.ttl);
-  if (isNaN(newTtl)) return res.status(400).json({ error: "Invalid TTL" });
+app.post('/api/settings', strictCors, requireAuth, async (req, res) => {
+  const userId = req.user.sub; 
   
-  config.ttl = newTtl;
-  res.json({ success: true, message: "Settings updated securely" });
+  const newTtl = parseInt(req.body.ttl);
+  const newDomains = req.body.domains || [];
+  
+  let parsedDomains = [];
+  if (Array.isArray(newDomains)) {
+    parsedDomains = newDomains.map(d => 
+      d.toLowerCase().replace(/^https?:\/\//, '').trim()
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('user_configs')
+    .upsert({
+      user_id: userId,
+      ttl: isNaN(newTtl) ? 60 : newTtl,
+      domains: parsedDomains,
+      updated_at: new Date()
+    }, { onConflict: 'user_id' })
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ success: false, error: "Database error" });
+  }
+
+  userConfigs[userId] = { ttl: data.ttl, domains: data.domains };
+  
+  res.json({ success: true, message: "Settings updated securely", config: userConfigs[userId] });
 });
 
 app.post('/api/purge', strictCors, requireAuth, (req, res) => {
-  // Purge only the data for the authenticated user making the request
-  const userId = req.user.sub; // 'sub' is the Supabase User ID in the JWT
+  const userId = req.user.sub;
   globalTraffic = globalTraffic.filter(t => t.clientId !== userId);
   res.json({ success: true, message: "Your cache purged securely" });
 });
 
-app.listen(PORT, () => console.log(`🛡️ SECURE CloudShield Backend Live on port ${PORT}`));
+app.listen(PORT, () => console.log(`Backend Live on port ${PORT}`));
